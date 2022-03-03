@@ -74,6 +74,8 @@ class CartItem implements Arrayable, Jsonable
      */
     public $options;
 
+    public $attributes;
+
     /**
      * The tax rate for the cart item.
      *
@@ -106,12 +108,12 @@ class CartItem implements Arrayable, Jsonable
      * CartItem constructor.
      *
      * @param int|string $id
-     * @param string     $name
-     * @param float      $price
-     * @param float      $weight
-     * @param array      $options
+     * @param string $name
+     * @param float $price
+     * @param float $weight
+     * @param array $options
      */
-    public function __construct($id, $name, $price, $weight = 0, array $options = [])
+    public function __construct($id, $name, $price, $weight = 0, array $options = [], array $attributes = [])
     {
         if (empty($id)) {
             throw new \InvalidArgumentException('Please supply a valid identifier.');
@@ -131,13 +133,14 @@ class CartItem implements Arrayable, Jsonable
         $this->price = floatval($price);
         $this->weight = floatval($weight);
         $this->options = new CartItemOptions($options);
+        $this->attributes = new CartItemAttributes($attributes);
         $this->rowId = $this->generateRowId($id, $options);
     }
 
     /**
      * Returns the formatted weight.
      *
-     * @param int    $decimals
+     * @param int $decimals
      * @param string $decimalPoint
      * @param string $thousandSeperator
      *
@@ -148,10 +151,19 @@ class CartItem implements Arrayable, Jsonable
         return $this->numberFormat($this->weight, $decimals, $decimalPoint, $thousandSeperator);
     }
 
+    public function priceOptions()
+    {
+        $options_price = 0;
+        foreach ($this->options as $option) {
+            $options_price += $option['price'];
+        }
+        return $options_price;
+    }
+
     /**
      * Returns the formatted price without TAX.
      *
-     * @param int    $decimals
+     * @param int $decimals
      * @param string $decimalPoint
      * @param string $thousandSeperator
      *
@@ -159,13 +171,13 @@ class CartItem implements Arrayable, Jsonable
      */
     public function price($decimals = null, $decimalPoint = null, $thousandSeperator = null)
     {
-        return $this->numberFormat($this->price, $decimals, $decimalPoint, $thousandSeperator);
+        return $this->numberFormat($this->price + $this->priceOptions(), $decimals, $decimalPoint, $thousandSeperator);
     }
 
     /**
      * Returns the formatted price with discount applied.
      *
-     * @param int    $decimals
+     * @param int $decimals
      * @param string $decimalPoint
      * @param string $thousandSeperator
      *
@@ -179,7 +191,7 @@ class CartItem implements Arrayable, Jsonable
     /**
      * Returns the formatted price with TAX.
      *
-     * @param int    $decimals
+     * @param int $decimals
      * @param string $decimalPoint
      * @param string $thousandSeperator
      *
@@ -194,7 +206,7 @@ class CartItem implements Arrayable, Jsonable
      * Returns the formatted subtotal.
      * Subtotal is price for whole CartItem without TAX.
      *
-     * @param int    $decimals
+     * @param int $decimals
      * @param string $decimalPoint
      * @param string $thousandSeperator
      *
@@ -209,7 +221,7 @@ class CartItem implements Arrayable, Jsonable
      * Returns the formatted total.
      * Total is price for whole CartItem with TAX.
      *
-     * @param int    $decimals
+     * @param int $decimals
      * @param string $decimalPoint
      * @param string $thousandSeperator
      *
@@ -223,7 +235,7 @@ class CartItem implements Arrayable, Jsonable
     /**
      * Returns the formatted tax.
      *
-     * @param int    $decimals
+     * @param int $decimals
      * @param string $decimalPoint
      * @param string $thousandSeperator
      *
@@ -237,7 +249,7 @@ class CartItem implements Arrayable, Jsonable
     /**
      * Returns the formatted tax.
      *
-     * @param int    $decimals
+     * @param int $decimals
      * @param string $decimalPoint
      * @param string $thousandSeperator
      *
@@ -251,7 +263,7 @@ class CartItem implements Arrayable, Jsonable
     /**
      * Returns the formatted discount.
      *
-     * @param int    $decimals
+     * @param int $decimals
      * @param string $decimalPoint
      * @param string $thousandSeperator
      *
@@ -265,7 +277,7 @@ class CartItem implements Arrayable, Jsonable
     /**
      * Returns the formatted total discount for this cart item.
      *
-     * @param int    $decimals
+     * @param int $decimals
      * @param string $decimalPoint
      * @param string $thousandSeperator
      *
@@ -279,7 +291,7 @@ class CartItem implements Arrayable, Jsonable
     /**
      * Returns the formatted total price for this cart item.
      *
-     * @param int    $decimals
+     * @param int $decimals
      * @param string $decimalPoint
      * @param string $thousandSeperator
      *
@@ -380,6 +392,20 @@ class CartItem implements Arrayable, Jsonable
     }
 
     /**
+     * Set the discount rate.
+     *
+     * @param int|float $discountRate
+     *
+     * @return \Gloudemans\Shoppingcart\CartItem
+     */
+    public function setAttributes($attributes)
+    {
+        $this->attributes = new CartItemAttributes($attributes);
+
+        return $this;
+    }
+
+    /**
      * Set cart instance.
      *
      * @param null|string $instance
@@ -412,12 +438,12 @@ class CartItem implements Arrayable, Jsonable
                 if (isset($this->associatedModel)) {
                     return with(new $this->associatedModel())->find($this->id);
                 }
-                // no break
+            // no break
             case 'modelFQCN':
                 if (isset($this->associatedModel)) {
                     return $this->associatedModel;
                 }
-                // no break
+            // no break
             case 'weightTotal':
                 return round($this->weight * $this->qty, $decimals);
         }
@@ -427,20 +453,20 @@ class CartItem implements Arrayable, Jsonable
             throw new InvalidCalculatorException('The configured Calculator seems to be invalid. Calculators have to implement the Calculator Contract.');
         }
 
-        return call_user_func($class->getName().'::getAttribute', $attribute, $this);
+        return call_user_func($class->getName() . '::getAttribute', $attribute, $this);
     }
 
     /**
      * Create a new instance from a Buyable.
      *
      * @param \Gloudemans\Shoppingcart\Contracts\Buyable $item
-     * @param array                                      $options
+     * @param array $options
      *
      * @return \Gloudemans\Shoppingcart\CartItem
      */
-    public static function fromBuyable(Buyable $item, array $options = [])
+    public static function fromBuyable(Buyable $item, array $options = [], array $attributes = [])
     {
-        return new self($item->getBuyableIdentifier($options), $item->getBuyableDescription($options), $item->getBuyablePrice($options), $item->getBuyableWeight($options), $options);
+        return new self($item->getBuyableIdentifier($options), $item->getBuyableDescription($options), $item->getBuyablePrice($options), $item->getBuyableWeight($options), $options, $attributes);
     }
 
     /**
@@ -461,9 +487,9 @@ class CartItem implements Arrayable, Jsonable
      * Create a new instance from the given attributes.
      *
      * @param int|string $id
-     * @param string     $name
-     * @param float      $price
-     * @param array      $options
+     * @param string $name
+     * @param float $price
+     * @param array $options
      *
      * @return \Gloudemans\Shoppingcart\CartItem
      */
@@ -476,7 +502,7 @@ class CartItem implements Arrayable, Jsonable
      * Generate a unique id for the cart item.
      *
      * @param string $id
-     * @param array  $options
+     * @param array $options
      *
      * @return string
      */
@@ -484,7 +510,7 @@ class CartItem implements Arrayable, Jsonable
     {
         ksort($options);
 
-        return md5($id.serialize($options));
+        return md5($id . serialize($options));
     }
 
     /**
@@ -495,17 +521,20 @@ class CartItem implements Arrayable, Jsonable
     public function toArray()
     {
         return [
-            'rowId'    => $this->rowId,
-            'id'       => $this->id,
-            'name'     => $this->name,
-            'qty'      => $this->qty,
-            'price'    => $this->price,
-            'weight'   => $this->weight,
-            'options'  => is_object($this->options)
+            'rowId' => $this->rowId,
+            'id' => $this->id,
+            'name' => $this->name,
+            'qty' => $this->qty,
+            'price' => $this->price,
+            'weight' => $this->weight,
+            'options' => is_object($this->options)
                 ? $this->options->toArray()
                 : $this->options,
+            'attributes' => is_object($this->attributes)
+                ? $this->attributes->toArray()
+                : $this->attributes,
             'discount' => $this->discount,
-            'tax'      => $this->tax,
+            'tax' => $this->tax,
             'subtotal' => $this->subtotal,
         ];
     }
@@ -525,8 +554,8 @@ class CartItem implements Arrayable, Jsonable
     /**
      * Get the formatted number.
      *
-     * @param float  $value
-     * @param int    $decimals
+     * @param float $value
+     * @param int $decimals
      * @param string $decimalPoint
      * @param string $thousandSeperator
      *
@@ -558,5 +587,38 @@ class CartItem implements Arrayable, Jsonable
     public function getDiscountRate()
     {
         return $this->discountRate;
+    }
+
+    public function applyDiscount()
+    {
+        $price = $this->price();
+        $discount = $this->getDiscountRate();
+
+        if ($this->valueIsPercentage($discount)) {
+            $value = $this->cleanValue($discount);
+            $value = $price * ($value / 100);
+            $result = floatval($price - $value);
+        } else {
+            $value = $this->cleanValue($discount);
+            $result = floatval($price - $value);
+        }
+
+        return $result < 0 ? 0.00 : $result;
+    }
+
+    protected function cleanValue($value)
+    {
+        return str_replace(['%', '-'], '', $value);
+    }
+
+    /**
+     * check if value is a percentage
+     *
+     * @param $value
+     * @return bool
+     */
+    protected function valueIsPercentage($value)
+    {
+        return (preg_match('/%/', $value) == 1);
     }
 }

@@ -13,7 +13,7 @@ class DefaultCalculator implements Calculator
 
         switch ($attribute) {
             case 'discount':
-                return $cartItem->price * ($cartItem->getDiscountRate() / 100);
+                return $cartItem->price - $cartItem->applyDiscount();
             case 'tax':
                 return round($cartItem->priceTarget * ($cartItem->taxRate / 100), $decimals);
             case 'priceTax':
@@ -21,7 +21,7 @@ class DefaultCalculator implements Calculator
             case 'discountTotal':
                 return round($cartItem->discount * $cartItem->qty, $decimals);
             case 'priceTotal':
-                return round($cartItem->price * $cartItem->qty, $decimals);
+                return round(($cartItem->price + $cartItem->priceOptions()) * $cartItem->qty, $decimals);
             case 'subtotal':
                 return max(round($cartItem->priceTotal - $cartItem->discountTotal, $decimals), 0);
             case 'priceTarget':
