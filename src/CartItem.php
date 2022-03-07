@@ -171,6 +171,11 @@ class CartItem implements Arrayable, Jsonable
      */
     public function price($decimals = null, $decimalPoint = null, $thousandSeperator = null)
     {
+        return $this->numberFormat($this->price, $decimals, $decimalPoint, $thousandSeperator);
+    }
+
+    public function priceWithOptions($decimals = null, $decimalPoint = null, $thousandSeperator = null)
+    {
         return $this->numberFormat($this->price + $this->priceOptions(), $decimals, $decimalPoint, $thousandSeperator);
     }
 
